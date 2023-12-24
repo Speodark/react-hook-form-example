@@ -1,5 +1,8 @@
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, FieldErrors } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
+import { useEffect } from "react";
+
+let renderCount = 0;
 
 type FormValues = {
   username: string;
@@ -18,6 +21,7 @@ type FormValues = {
 };
 
 export const YouTubeForm = () => {
+  renderCount += 1;
   const form = useForm<FormValues>({
     defaultValues: {
       username: "batman",
@@ -32,9 +36,29 @@ export const YouTubeForm = () => {
       age: 0,
       dob: new Date(),
     },
+    mode: "onChange",
   });
-  const { register, control, handleSubmit, formState } = form;
-  const { errors } = formState;
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState,
+    watch,
+    getValues,
+    setValue,
+    reset,
+    trigger,
+  } = form;
+  // const { errors, dirtyFields, touchedFields, isDirty, submitCount } = formState;
+  // console.log({ touchedFields, dirtyFields, isDirty });
+  const {
+    errors,
+    isDirty,
+    isValid,
+    isSubmitting,
+    isSubmitted,
+    isSubmitSuccessful,
+  } = formState;
 
   const { fields, append, remove } = useFieldArray({
     name: "phNumbers",
@@ -45,11 +69,48 @@ export const YouTubeForm = () => {
     console.log("Form submitted", data);
   };
 
+  const onError = (errors: FieldErrors<FormValues>) => {
+    console.log("Form errors", errors);
+  };
+
+  // This way every change rerender the component
+  // const watchUsername = watch("username");
+  // const watchUsernameAndEmail = watch(["username", "email"]);
+  // const watchForm = watch();
+
+  // This way it doesn't rerender the component
+  // useEffect(() => {
+  //   const subscription = watch((value) => {
+  //     console.log(value);
+  //   });
+  //   return () => subscription.unsubscribe();
+  // }, [watch]);
+
+  useEffect(() => {
+    if (isSubmitSuccessful) {
+      reset();
+    }
+  }, [isSubmitSuccessful, reset]);
+
+  const handleGetValues = () => {
+    // console.log("Get values", getValues());
+    // console.log("Get values", getValues("social"));
+    console.log("Get values", getValues(["social", "username"]));
+  };
+
+  const handleSetValue = () => {
+    setValue("username", "", {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
   return (
     <div>
-      <h1>YouTube Form</h1>
+      <h1>YouTube Form {renderCount / 2}</h1>
+      {/* <h2>Watched value: {JSON.stringify(watchForm)}</h2> */}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form onSubmit={handleSubmit(onSubmit, onError)} noValidate>
         <label htmlFor="username">Username</label>
         <input
           type="text"
@@ -78,6 +139,13 @@ export const YouTubeForm = () => {
                   "This domain is not supported"
                 );
               },
+              emailAvailable: async (fieldValue) => {
+                const response = await fetch(
+                  `https://jsonplaceholder.typicode.com/users?email=${fieldValue}`
+                );
+                const data = await response.json();
+                return data.length == 0 || "Email already exists";
+              },
             },
           })}
         />
@@ -97,7 +165,14 @@ export const YouTubeForm = () => {
         <p className="error">{errors.channel?.message}</p>
 
         <label htmlFor="twitter">Twitter</label>
-        <input type="text" id="twitter" {...register("social.twitter")} />
+        <input
+          type="text"
+          id="twitter"
+          {...register("social.twitter", {
+            disabled: watch("channel") === "",
+            required: "Enter twitter profile!",
+          })}
+        />
         <p className="error">{errors.social?.twitter?.message}</p>
 
         <label htmlFor="facebook">Facebook</label>
@@ -168,7 +243,25 @@ export const YouTubeForm = () => {
         />
         <p className="error">{errors.dob?.message}</p>
 
-        <button>Submit</button>
+        <button disabled={!isDirty || !isValid || isSubmitting}>Submit</button>
+        <button type="button" onClick={() => reset()}>
+          Reset
+        </button>
+        <button type="button" onClick={handleGetValues}>
+          Get values
+        </button>
+        <button type="button" onClick={handleSetValue}>
+          Set value
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            trigger();
+            trigger("social.facebook");
+          }}
+        >
+          Validate
+        </button>
       </form>
       <DevTool control={control} />
     </div>
